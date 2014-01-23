@@ -8,7 +8,7 @@ sp = SerialPort.new("/dev/ttyUSB0",
                       'parity' => SerialPort::NONE
                     })
 
-sleep 5
+sleep 1
 poweroff(sp)
 
 #banner = sp.readpartial(80);
@@ -23,26 +23,21 @@ poweroff(sp)
 #   sleep 1
 # end
 
-delay = 0.1
+delay = 0.05
 
 length = 100
 
-power = 75
+power = 10
 
-x = 0
-y = 500
+x = 200
+y = 0
 
-poweron(sp, power)
-puts "Line 1"
-line(sp, x, y, x+length, y, delay)
-puts "Line 2"
-line(sp, x+length, y, x+length, y+length, delay)
-puts "Line 3"
-line(sp, x+length, y+length, x, y+length, delay)
-puts "Line 4"
-line(sp, x, y+length, x, y, delay)
-poweroff(sp)
+for i in 1..10
+  rectangle(sp, x, y, length, length, delay, power)
+  power += 10
+  y += 200
+end
+
 reset(sp)
-puts "DONE"
 
 sleep 1
