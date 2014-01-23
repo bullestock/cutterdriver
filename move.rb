@@ -37,3 +37,15 @@ end
 def move(s, x, y)
   s.puts "PA#{x.to_i()},#{y.to_i()};"
 end
+
+def poweron(s, level)
+  s.puts "PD#{level.to_i()};"
+end
+
+def poweroff(s)
+  s.puts "PU;"
+end
+
+def reset(s)
+  s.puts "PA0,0;"
+end
