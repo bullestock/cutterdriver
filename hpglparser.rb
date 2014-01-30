@@ -1,4 +1,10 @@
-def generateMoveCommands(s)
+def generateMoveCommands(bb, s)
+  minX = bb[0]
+  minY = bb[1]
+  maxX = bb[2]
+  maxY = bb[3]
+  xScale = 15000/(maxX-minX)
+  yScale = 15000/(maxY-minY)
   numbers = s.split(",")
   firstCoords = true
   isX = true
@@ -7,13 +13,13 @@ def generateMoveCommands(s)
   numbers.each { |n|
     n = n.to_i()
     if (isX)
-      n += 9039
-      n = (n/5).to_i()
+      n -= minX
+      n *= xScale
       coords = "#{n}, "
       isX = false
     else
-      n += 9050
-      n = (n/5).to_i()
+      n -= minY
+      n *= yScale
       coords += "#{n}"
       if (firstCoords)
         puts "move(sp, #{coords})"
@@ -28,7 +34,45 @@ def generateMoveCommands(s)
   }
 end
 
+def computeBoundingBox(bb, s)
+  numbers = s.split(",")
+  firstCoords = true
+  isX = true
+  coords = ""
+  prevCoords = ""
+  numbers.each { |n|
+    n = n.to_i()
+    if (isX)
+      bb[0] = [bb[0], n].min()
+      bb[2] = [bb[2], n].max()
+      isX = false
+    else
+      bb[1] = [bb[1], n].min()
+      bb[3] = [bb[3], n].max()
+      isX = true
+    end
+  }
+  return bb
+end
+
 def pass1(lines)
+  minX = 1e6
+  maxX = 0
+  minY = 1e6
+  maxY = 0
+  bb = [minX, minY, maxX, maxY]
+  lines.each { |c|
+    c.strip!
+    prefix = c[0..1]
+    if (prefix == "PA")
+      bb = computeBoundingBox(bb, c[2..-1])
+    end
+  }
+  puts "BB: #{bb}"
+  return bb
+end
+
+def pass2(bb, lines)
   lines.each { |c|
     c.strip!
     #puts c
@@ -36,7 +80,7 @@ def pass1(lines)
     #puts prefix
     if (prefix == "PU")
       puts "poweroff(sp)"
-      generateMoveCommands(c[2..-1])
+      generateMoveCommands(bb, c[2..-1])
     end
     if (prefix == "PD")
       if (c.length > 2)
@@ -45,7 +89,7 @@ def pass1(lines)
       puts "poweron(sp, power)"
     end
     if (prefix == "PA")
-      generateMoveCommands(c[2..-1])
+      generateMoveCommands(bb, c[2..-1])
     end
   }
 end
@@ -58,5 +102,7 @@ text = File.open(filename).read()
 
 commands = text.split(";")
 
-pass1(commands)
+bb = pass1(commands)
+
+pass2(bb, commands)
 
