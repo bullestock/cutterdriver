@@ -139,7 +139,12 @@ if width == 0
   exit
 end
 
-puts "Cutting #{filename} at #{width}"
+power = ARGV[2].to_i()
+if power == 0
+  power = 30
+end
+
+puts "Cutting #{filename} at width #{width} cm, #{power} % power"
 
 sp = nil
 if !isTextMode
@@ -155,7 +160,6 @@ if !isTextMode
   poweroff(sp)
 end
 
-power = 30
 #delay = 0.05
 delay = 0.02
 
