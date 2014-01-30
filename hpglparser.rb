@@ -17,7 +17,12 @@ OptionParser.new do |opts|
   end
 end.parse!
 
-def generateMoveCommands(bb, s, sp, width, delay, doDryRun, isTextMode)
+def generateMoveCommands(bb, s, sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+  numbers = s.split(",")
+  generateMoveCommandsFromArray(bb, numbers, sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+end
+
+def generateMoveCommandsFromArray(bb, numbers, sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
   minX = bb[0]
   minY = bb[1]
   maxX = bb[2]
@@ -26,7 +31,6 @@ def generateMoveCommands(bb, s, sp, width, delay, doDryRun, isTextMode)
   xScale = width*stepsPerCm/(maxX-minX)
 #  xScale = 15000.0/(maxX-minX)
   yScale = xScale
-  numbers = s.split(",")
   firstCoords = true
   isX = true
   coords = []
@@ -36,28 +40,22 @@ def generateMoveCommands(bb, s, sp, width, delay, doDryRun, isTextMode)
     if (isX)
       n -= minX
       n *= xScale
+      n += xOffset*stepsPerCm
       coords = [n.to_i()]
       isX = false
     else
       n -= minY
       n *= yScale
+      n += yOffset*stepsPerCm
       coords.push(n.to_i())
       if (firstCoords)
-        if isTextMode
-          puts "move(sp, #{coords[0]}, #{coords[1]})"
-        else
-          move(sp, coords[0], coords[1])
-        end
+        move(sp, coords[0], coords[1], isTextMode)
         firstCoords = false
       else
-        if isTextMode
-          puts "line(sp, #{prevCoords[0]}, #{prevCoords[1]}, #{coords[0]}, #{coords[1]}, #{delay})"
+        if doDryRun
+          move(sp, coords[0], coords[1], isTextMode)
         else
-          if doDryRun
-            move(sp, coords[0], coords[1])
-          else
-            line(sp, prevCoords[0], prevCoords[1], coords[0], coords[1], delay)
-          end
+          line(sp, prevCoords[0], prevCoords[1], coords[0], coords[1], delay, isTextMode)
         end
       end
       prevCoords = coords
@@ -104,7 +102,8 @@ def pass1(lines)
   return bb
 end
 
-def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode)
+def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOffset)
+  line = 0
   lines.each { |c|
     c.strip!
     #puts c
@@ -114,20 +113,48 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode)
       if !isTextMode
         poweroff(sp)
       end
-      generateMoveCommands(bb, c[2..-1], sp, width, delay, doDryRun, isTextMode)
+      generateMoveCommands(bb, c[2..-1], sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+      if !isTextMode && !doDryRun
+        sleep 1
+      end
     end
     if (prefix == "PD")
       if (c.length > 2)
-        generateMoveCommands(c[2..-1], sp, width, delay, doDryRun, isTextMode)
+        numbers = c[2..-1].split(",")
+        generateMoveCommands(numbers[0], sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+        if !doDryRun
+          if isTextMode
+            puts "poweron(sp, #{power})"
+          else
+            poweron(sp, power)
+          end
+        end
+        if (numbers.length > 1)
+          generateMoveCommands(numbers[1..-1], sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+        end
       end
-      if !doDryRun && !isTextMode
-        poweron(sp, power)
+    else
+      if !doDryRun
+        if isTextMode
+          puts "poweron(sp, #{power})"
+        else
+          poweron(sp, power)
+        end
       end
     end
     if (prefix == "PA")
-      generateMoveCommands(bb, c[2..-1], sp, width, delay, doDryRun, isTextMode)
+      generateMoveCommands(bb, c[2..-1], sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+    end
+    line += 1
+    percent = line*100.0/lines.size()
+    if !isTextMode && !doDryRun
+      print "#{percent.to_i()} %\r"
+      STDOUT.flush
     end
   }
+  if !isTextMode && !doDryRun
+    puts ""
+  end
 end
 
 filename = ARGV[0]
@@ -144,6 +171,9 @@ if power == 0
   power = 30
 end
 
+xOffset = ARGV[3].to_i()
+yOffset = ARGV[4].to_i()
+
 puts "Cutting #{filename} at width #{width} cm, #{power} % power"
 
 sp = nil
@@ -153,21 +183,18 @@ if !isTextMode
                         'data_bits' => 8,
                         'parity' => SerialPort::NONE
                       })
-end
-
-if !isTextMode
   sleep 1
   poweroff(sp)
 end
 
 #delay = 0.05
-delay = 0.02
+delay = 0.05
 
 commands = text.split(";")
 
 bb = pass1(commands)
 
-pass2(bb, commands, sp, width, power, delay, doDryRun, isTextMode)
+pass2(bb, commands, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOffset)
 
 if !isTextMode
   reset(sp)
