@@ -1,5 +1,9 @@
 # Draw a line between two points. x: 0-15000, y: 0-10000
-def line(s, p1x, p1y, p2x, p2y, delay)
+def line(s, p1x, p1y, p2x, p2y, delay, isTextMode)
+
+  if isTextMode
+    puts "line(sp, #{p1x}, #{p1y}, #{p2x}, #{p2y}, #{delay})"
+  end
 
   deltax = (p2x - p1x).to_i()
   deltay = (p2y - p1y).to_i()
@@ -9,34 +13,43 @@ def line(s, p1x, p1y, p2x, p2y, delay)
   if deltax == 0
     y = p1y
     begin
-      move(s, p1x, y)
+      move(s, p1x, y, isTextMode)
       y += ystep
-      sleep delay
+      if !isTextMode 
+        sleep delay
+      end
     end while y != p2y+ystep
     return
   end
 
-  error = 0
+  error = 0.0
   deltaerror = (deltay.to_f() / deltax.to_f()).abs()
   xstep = deltax > 0 ? 1 : -1
 
   y = p1y
   x = p1x
   begin
-    move(s, x, y)
-    sleep delay
+    move(s, x, y, isTextMode)
+    if !isTextMode 
+      sleep delay
+    end
     error += deltaerror
-    if error >= 0.5
+    while error >= 0.5
       y += ystep
-      --error
+      error -= 1.0
     end
     x += xstep
   end while x != p2x+xstep
 end
 
 # Move to a specific position. x: 0-15000, y: 0-10000
-def move(s, x, y)
-  s.puts "PA#{x.to_i()},#{y.to_i()};"
+def move(s, x, y, isTextMode)
+  if isTextMode
+    puts "move(sp, #{x}, #{y})"
+    puts "PA#{x.to_i()},#{y.to_i()};"
+  else
+    s.puts "PA#{x.to_i()},#{y.to_i()};"
+  end
 end
 
 # Turn the laser on.
