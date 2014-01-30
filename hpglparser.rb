@@ -110,7 +110,9 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
     prefix = c[0..1]
     #puts prefix
     if (prefix == "PU")
-      if !isTextMode
+      if isTextMode
+        puts "poweroff(sp)"
+      else
         poweroff(sp)
       end
       generateMoveCommands(bb, c[2..-1], sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
@@ -124,7 +126,7 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
         generateMoveCommands(numbers[0], sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
         if !doDryRun
           if isTextMode
-            puts "poweron(sp, #{power})"
+            puts "poweron(sp, #{power}) ; #{c}"
           else
             poweron(sp, power)
           end
@@ -132,13 +134,13 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
         if (numbers.length > 1)
           generateMoveCommands(numbers[1..-1], sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
         end
-      end
-    else
-      if !doDryRun
-        if isTextMode
-          puts "poweron(sp, #{power})"
-        else
-          poweron(sp, power)
+      else
+        if !doDryRun
+          if isTextMode
+            puts "poweron(sp, #{power})"
+          else
+            poweron(sp, power)
+          end
         end
       end
     end
