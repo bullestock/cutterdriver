@@ -37,7 +37,6 @@ end
 # Move to a specific position. x: 0-15000, y: 0-10000
 def move(s, x, y)
   s.puts "PA#{x.to_i()},#{y.to_i()};"
-  sleep 0.1
 end
 
 # Turn the laser on.
