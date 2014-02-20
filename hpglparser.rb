@@ -7,7 +7,7 @@ doDryRun = false
 isTextMode = false
 
 OptionParser.new do |opts|
-  opts.banner = "Usage: hpglparser.rb [-n] [-t] file width"
+  opts.banner = "Usage: hpglparser.rb [-n] [-t] file width [power] [xOffset] [yOffset]"
 
   opts.on("-n", "--dry-run", "Dry run") do |n|
     doDryRun = n
@@ -17,19 +17,18 @@ OptionParser.new do |opts|
   end
 end.parse!
 
-def generateMoveCommands(bb, s, sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+def generateMoveCommands(bb, s, sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
   numbers = s.split(",")
-  generateMoveCommandsFromArray(bb, numbers, sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+  generateMoveCommandsFromArray(bb, numbers, sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
 end
 
-def generateMoveCommandsFromArray(bb, numbers, sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+def generateMoveCommandsFromArray(bb, numbers, sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
   minX = bb[0]
   minY = bb[1]
   maxX = bb[2]
   maxY = bb[3]
   stepsPerCm = 400.0
   xScale = width*stepsPerCm/(maxX-minX)
-#  xScale = 15000.0/(maxX-minX)
   yScale = xScale
   firstCoords = true
   isX = true
@@ -115,7 +114,7 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
       else
         poweroff(sp)
       end
-      generateMoveCommands(bb, c[2..-1], sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+      generateMoveCommands(bb, c[2..-1], sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
       if !isTextMode && !doDryRun
         sleep 1
       end
@@ -123,7 +122,7 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
     if (prefix == "PD")
       if (c.length > 2)
         numbers = c[2..-1].split(",")
-        generateMoveCommands(numbers[0], sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+        generateMoveCommands(numbers[0], sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
         if !doDryRun
           if isTextMode
             puts "poweron(sp, #{power}) ; #{c}"
@@ -132,7 +131,7 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
           end
         end
         if (numbers.length > 1)
-          generateMoveCommands(numbers[1..-1], sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+          generateMoveCommandsFromArray(numbers[1..-1], sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
         end
       else
         if !doDryRun
@@ -145,7 +144,7 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
       end
     end
     if (prefix == "PA")
-      generateMoveCommands(bb, c[2..-1], sp, width, delay, doDryRun, isTextMode, xOffset, yOffset)
+      generateMoveCommands(bb, c[2..-1], sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
     end
     line += 1
     percent = line*100.0/lines.size()
@@ -178,27 +177,34 @@ yOffset = ARGV[4].to_i()
 
 puts "Cutting #{filename} at width #{width} cm, #{power} % power"
 
-sp = nil
+$sp = nil
 if !isTextMode
-  sp = SerialPort.new("/dev/ttyUSB0",
+  $sp = SerialPort.new("/dev/ttyUSB0",
                       { 'baud' => 9600,
                         'data_bits' => 8,
                         'parity' => SerialPort::NONE
                       })
   sleep 1
-  poweroff(sp)
+  poweroff($sp)
+
+  trap("SIGINT") {
+    poweroff($sp)
+    exit!
+  }
+
 end
 
 #delay = 0.05
-delay = 0.05
+delay = 0.1
 
 commands = text.split(";")
 
 bb = pass1(commands)
 
-pass2(bb, commands, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOffset)
+pass2(bb, commands, $sp, width, power, delay, doDryRun, isTextMode, xOffset, yOffset)
 
 if !isTextMode
-  reset(sp)
-  poweroff(sp)
+  sleep 1
+  reset($sp)
+  poweroff($sp)
 end
