@@ -24,22 +24,40 @@ def line(s, p1x, p1y, p2x, p2y, delay, isTextMode)
 
   error = 0.0
   deltaerror = (deltay.to_f() / deltax.to_f()).abs()
-  xstep = deltax > 0 ? 1 : -1
-
   y = p1y
   x = p1x
-  begin
-    move(s, x, y, isTextMode)
-    if !isTextMode 
-      sleep delay
-    end
-    error += deltaerror
-    while error >= 0.5
+  xstep = deltax > 0 ? 1 : -1
+
+  if deltaerror > 1
+    deltaerror = (deltax.to_f() / deltay.to_f()).abs()
+    y = p1y
+    x = p1x
+    begin
+      move(s, x, y, isTextMode)
+      if !isTextMode 
+        sleep delay
+      end
+      error += deltaerror
+      while error >= 0.5
+        x += xstep
+        error -= 1.0
+      end
       y += ystep
-      error -= 1.0
-    end
-    x += xstep
-  end while x != p2x+xstep
+    end while y != p2y+ystep
+  else
+    begin
+      move(s, x, y, isTextMode)
+      if !isTextMode 
+        sleep delay
+      end
+      error += deltaerror
+      while error >= 0.5
+        y += ystep
+        error -= 1.0
+      end
+      x += xstep
+    end while x != p2x+xstep
+  end
 end
 
 # Move to a specific position. x: 0-15000, y: 0-10000
