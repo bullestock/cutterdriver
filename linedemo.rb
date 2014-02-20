@@ -1,3 +1,3 @@
 require './move'
 
-line(0, 0, 150, 200)
+line($stdout, 0, 0, 150, 200)
