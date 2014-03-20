@@ -7,7 +7,7 @@ doDryRun = false
 isTextMode = false
 
 OptionParser.new do |opts|
-  opts.banner = "Usage: hpglparser.rb [-n] [-t] file width [power] [xOffset] [yOffset]"
+  opts.banner = "Usage: hpglparser.rb [-n] [-t] file width [power] [xOffset] [yOffset] [speed]"
 
   opts.on("-n", "--dry-run", "Dry run") do |n|
     doDryRun = n
@@ -175,6 +175,8 @@ end
 xOffset = ARGV[3].to_i()
 yOffset = ARGV[4].to_i()
 
+speed = ARGV[5].to_i()
+
 puts "Cutting #{filename} at width #{width} cm, #{power} % power"
 
 $sp = nil
@@ -194,8 +196,8 @@ if !isTextMode
 
 end
 
-#delay = 0.05
-delay = 0.1
+delay = 0.1/(speed+1)
+puts "Using delay #{delay}"
 
 commands = text.split(";")
 
