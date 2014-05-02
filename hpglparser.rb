@@ -94,7 +94,7 @@ def pass1(lines)
   lines.each { |c|
     c.strip!
     prefix = c[0..1]
-    if (prefix == "PA")
+    if (prefix == "PA") || (prefix == "PU") || (prefix == "PD")
       bb = computeBoundingBox(bb, c[2..-1])
     end
   }
@@ -110,6 +110,7 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
     #puts prefix
     if (prefix == "PU")
       if isTextMode
+        puts "# PU"
         puts "poweroff(sp)"
       else
         poweroff(sp)
@@ -120,18 +121,21 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
       end
     end
     if (prefix == "PD")
+      if isTextMode
+        puts "# PD, length #{c.length}"
+      end
       if (c.length > 2)
         numbers = c[2..-1].split(",")
-        generateMoveCommands(numbers[0], sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
+        generateMoveCommandsFromArray(bb, numbers[0..1], sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
         if !doDryRun
           if isTextMode
-            puts "poweron(sp, #{power}) ; #{c}"
+            puts "poweron(sp, #{power})"
           else
             poweron(sp, power)
           end
         end
-        if (numbers.length > 1)
-          generateMoveCommandsFromArray(numbers[1..-1], sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
+        if (numbers.length > 2)
+          generateMoveCommandsFromArray(bb, numbers[2..-1], sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
         end
       else
         if !doDryRun
