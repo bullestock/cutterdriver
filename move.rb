@@ -5,8 +5,13 @@ def line(s, p1x, p1y, p2x, p2y, delay, isTextMode)
     puts "line(sp, #{p1x}, #{p1y}, #{p2x}, #{p2y}, #{delay})"
   end
 
-  deltax = (p2x - p1x).to_i()
-  deltay = (p2y - p1y).to_i()
+  p1x = p1x.to_i()
+  p1y = p1y.to_i()
+  p2x = p2x.to_i()
+  p2y = p2y.to_i()
+
+  deltax = p2x - p1x
+  deltay = p2y - p1y
 
   ystep = deltay > 0 ? 1 : -1
 
@@ -63,7 +68,7 @@ end
 # Move to a specific position. x: 0-15000, y: 0-10000
 def move(s, x, y, isTextMode)
   if isTextMode
-    puts "move(sp, #{x}, #{y})"
+    puts "# move(sp, #{x}, #{y})"
     puts "PA#{x.to_i()},#{y.to_i()};"
   else
     s.puts "PA#{x.to_i()},#{y.to_i()};"
