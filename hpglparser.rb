@@ -17,12 +17,7 @@ OptionParser.new do |opts|
   end
 end.parse!
 
-def generateMoveCommands(bb, s, sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
-  numbers = s.split(",")
-  generateMoveCommandsFromArray(bb, numbers, sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
-end
-
-def generateMoveCommandsFromArray(bb, numbers, sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
+def generateMoveCommands(bb, numbers, penDown, prevPos, sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
   minX = bb[0]
   minY = bb[1]
   maxX = bb[2]
@@ -33,35 +28,74 @@ def generateMoveCommandsFromArray(bb, numbers, sp, width, delay, power, doDryRun
   firstCoords = true
   isX = true
   coords = []
-  prevCoords = []
+  x = 0
+  sX = 0
   numbers.each { |n|
     n = n.to_f()
     if (isX)
-      n -= minX
-      n *= xScale
-      n += xOffset*stepsPerCm
-      coords = [n.to_i()]
+      x = n
+      sX = x
+      sX -= minX
+      sX *= xScale
+      sX += xOffset*stepsPerCm
+      sX = sX.to_i()
+      coords = [sX]
       isX = false
     else
-      n -= minY
-      n *= yScale
-      n += yOffset*stepsPerCm
-      coords.push(n.to_i())
-      if (firstCoords)
+      y = n
+      sY = y
+      sY -= minY
+      sY *= yScale
+      sY += yOffset*stepsPerCm
+      sY = sY.to_i()
+      coords.push(sY)
+      if isTextMode
+        puts "# (#{x}, #{y}) -> (#{sX}, #{sY})"
+      end
+      if (firstCoords && !penDown)
         move(sp, coords[0], coords[1], isTextMode)
         firstCoords = false
       else
         if doDryRun
           move(sp, coords[0], coords[1], isTextMode)
         else
-          line(sp, prevCoords[0], prevCoords[1], coords[0], coords[1], delay, isTextMode)
+          line(sp, prevPos[0], prevPos[1], coords[0], coords[1], delay, isTextMode)
         end
       end
-      prevCoords = coords
+      prevPos = coords
+      if isTextMode
+        puts "# new prevPos #{prevPos}"
+      end
       isX = true
       coords = ""
     end
   }
+  return prevPos
+end
+
+def moveTo(bb, numbers, sp, isTextMode, width, xOffset, yOffset)
+  minX = bb[0]
+  minY = bb[1]
+  maxX = bb[2]
+  maxY = bb[3]
+  stepsPerCm = 400.0
+  xScale = width*stepsPerCm/(maxX-minX)
+  yScale = xScale
+  x = numbers[0].to_f()
+  sX = x
+  sX -= minX
+  sX *= xScale
+  sX += xOffset*stepsPerCm
+  y = numbers[1].to_f()
+  sY = y
+  sY -= minY
+  sY *= yScale
+  sY += yOffset*stepsPerCm
+  if isTextMode
+    puts "# (#{x}, #{y}) -> (#{sX}, #{sY})"
+  end
+  move(sp, sX, sY, isTextMode)
+  return [sX, sY]
 end
 
 def computeBoundingBox(bb, s)
@@ -69,7 +103,6 @@ def computeBoundingBox(bb, s)
   firstCoords = true
   isX = true
   coords = ""
-  prevCoords = ""
   numbers.each { |n|
     n = n.to_f()
     if (isX)
@@ -85,7 +118,7 @@ def computeBoundingBox(bb, s)
   return bb
 end
 
-def pass1(lines)
+def pass1(lines, isTextMode)
   minX = 1e6
   maxX = 0
   minY = 1e6
@@ -98,11 +131,16 @@ def pass1(lines)
       bb = computeBoundingBox(bb, c[2..-1])
     end
   }
+  if isTextMode
+    puts "# Bounding box #{bb}"
+  end
   return bb
 end
 
 def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOffset)
   line = 0
+  penDown = false
+  prevPos = []
   lines.each { |c|
     c.strip!
     #puts c
@@ -110,23 +148,25 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
     #puts prefix
     if (prefix == "PU")
       if isTextMode
-        puts "# PU"
+        puts "# PU #{c[2..-1]}"
         puts "poweroff(sp)"
       else
         poweroff(sp)
       end
-      generateMoveCommands(bb, c[2..-1], sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
+      penDown = false
+      pos = c[2..-1].split(",")
+      prevPos = moveTo(bb, pos, sp, isTextMode, width, xOffset, yOffset)
       if !isTextMode && !doDryRun
         sleep 1
       end
     end
     if (prefix == "PD")
       if isTextMode
-        puts "# PD, length #{c.length}"
+        puts "# PD #{c[2..-1]}"
       end
+      penDown = true
       if (c.length > 2)
         numbers = c[2..-1].split(",")
-        generateMoveCommandsFromArray(bb, numbers[0..1], sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
         if !doDryRun
           if isTextMode
             puts "poweron(sp, #{power})"
@@ -134,9 +174,8 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
             poweron(sp, power)
           end
         end
-        if (numbers.length > 2)
-          generateMoveCommandsFromArray(bb, numbers[2..-1], sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
-        end
+        puts "# prevPos #{prevPos}"
+        prevPos = generateMoveCommands(bb, numbers, penDown, prevPos, sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
       else
         if !doDryRun
           if isTextMode
@@ -148,7 +187,11 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
       end
     end
     if (prefix == "PA")
-      generateMoveCommands(bb, c[2..-1], sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
+      if isTextMode
+        puts "# PA #{c[2..-1]}"
+        puts "# prevPos #{prevPos}"
+      end
+      prevPos = generateMoveCommands(bb, c[2..-1].split(","), penDown, prevPos, sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
     end
     line += 1
     percent = line*100.0/lines.size()
@@ -205,7 +248,7 @@ puts "Using delay #{delay}"
 
 commands = text.split(";")
 
-bb = pass1(commands)
+bb = pass1(commands, isTextMode)
 
 pass2(bb, commands, $sp, width, power, delay, doDryRun, isTextMode, xOffset, yOffset)
 
