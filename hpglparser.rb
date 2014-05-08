@@ -5,6 +5,7 @@ require 'optparse'
 
 doDryRun = false
 isTextMode = false
+doMirror = false
 
 OptionParser.new do |opts|
   opts.banner = "Usage: hpglparser.rb [-n] [-t] file width [power] [xOffset] [yOffset] [speed]"
@@ -15,9 +16,33 @@ OptionParser.new do |opts|
   opts.on("-t", "--text", "Dump commands") do |n|
     isTextMode = n
   end
+  opts.on("-m", "--mirror", "Mirror around Y.axis") do |n|
+    doMirror = n
+  end
 end.parse!
 
-def generateMoveCommands(bb, numbers, penDown, prevPos, sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
+def scale(x, y, bb, xOffset, yOffset, xScale, yScale, doMirror)
+  stepsPerCm = 400.0
+  minX = bb[0]
+  minY = bb[1]
+  maxX = bb[2]
+  maxY = bb[3]
+  sX = x
+  sX -= minX
+  sX *= xScale
+  sX += xOffset*stepsPerCm
+  sY = y
+  if doMirror
+    sY = maxY - sY
+  else
+    sY -= minY
+  end
+  sY *= yScale
+  sY += yOffset*stepsPerCm
+  return [ sX.to_i(), sY.to_i()]
+end
+
+def generateMoveCommands(bb, numbers, penDown, prevPos, sp, width, delay, power, doDryRun, isTextMode, doMirror, xOffset, yOffset)
   minX = bb[0]
   minY = bb[1]
   maxX = bb[2]
@@ -34,23 +59,12 @@ def generateMoveCommands(bb, numbers, penDown, prevPos, sp, width, delay, power,
     n = n.to_f()
     if (isX)
       x = n
-      sX = x
-      sX -= minX
-      sX *= xScale
-      sX += xOffset*stepsPerCm
-      sX = sX.to_i()
-      coords = [sX]
       isX = false
     else
       y = n
-      sY = y
-      sY -= minY
-      sY *= yScale
-      sY += yOffset*stepsPerCm
-      sY = sY.to_i()
-      coords.push(sY)
+      coords = scale(x, y, bb, xOffset, yOffset, xScale, yScale, doMirror)
       if isTextMode
-        puts "# (#{x}, #{y}) -> (#{sX}, #{sY})"
+        puts "# (#{x}, #{y}) -> (#{coords[0]}, #{coords[1]})"
       end
       if (firstCoords && !penDown)
         move(sp, coords[0], coords[1], isTextMode)
@@ -63,9 +77,6 @@ def generateMoveCommands(bb, numbers, penDown, prevPos, sp, width, delay, power,
         end
       end
       prevPos = coords
-      if isTextMode
-        puts "# new prevPos #{prevPos}"
-      end
       isX = true
       coords = ""
     end
@@ -73,7 +84,7 @@ def generateMoveCommands(bb, numbers, penDown, prevPos, sp, width, delay, power,
   return prevPos
 end
 
-def moveTo(bb, numbers, sp, isTextMode, width, xOffset, yOffset)
+def moveTo(bb, numbers, sp, isTextMode, doMirror, width, xOffset, yOffset)
   minX = bb[0]
   minY = bb[1]
   maxX = bb[2]
@@ -82,20 +93,13 @@ def moveTo(bb, numbers, sp, isTextMode, width, xOffset, yOffset)
   xScale = width*stepsPerCm/(maxX-minX)
   yScale = xScale
   x = numbers[0].to_f()
-  sX = x
-  sX -= minX
-  sX *= xScale
-  sX += xOffset*stepsPerCm
   y = numbers[1].to_f()
-  sY = y
-  sY -= minY
-  sY *= yScale
-  sY += yOffset*stepsPerCm
+  coords = scale(x, y, bb, xOffset, yOffset, xScale, yScale, doMirror)
   if isTextMode
-    puts "# (#{x}, #{y}) -> (#{sX}, #{sY})"
+    puts "# (#{x}, #{y}) -> (#{coords[0]}, #{coords[1]})"
   end
-  move(sp, sX, sY, isTextMode)
-  return [sX, sY]
+  move(sp, coords[0], coords[1], isTextMode)
+  return [coords[0], coords[1]]
 end
 
 def computeBoundingBox(bb, s)
@@ -137,7 +141,7 @@ def pass1(lines, isTextMode)
   return bb
 end
 
-def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOffset)
+def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, doMirror, xOffset, yOffset)
   line = 0
   penDown = false
   prevPos = []
@@ -155,7 +159,7 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
       end
       penDown = false
       pos = c[2..-1].split(",")
-      prevPos = moveTo(bb, pos, sp, isTextMode, width, xOffset, yOffset)
+      prevPos = moveTo(bb, pos, sp, isTextMode, doMirror, width, xOffset, yOffset)
       if !isTextMode && !doDryRun
         sleep 1
       end
@@ -174,8 +178,7 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
             poweron(sp, power)
           end
         end
-        puts "# prevPos #{prevPos}"
-        prevPos = generateMoveCommands(bb, numbers, penDown, prevPos, sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
+        prevPos = generateMoveCommands(bb, numbers, penDown, prevPos, sp, width, delay, power, doDryRun, isTextMode, doMirror, xOffset, yOffset)
       else
         if !doDryRun
           if isTextMode
@@ -191,7 +194,7 @@ def pass2(bb, lines, sp, width, power, delay, doDryRun, isTextMode, xOffset, yOf
         puts "# PA #{c[2..-1]}"
         puts "# prevPos #{prevPos}"
       end
-      prevPos = generateMoveCommands(bb, c[2..-1].split(","), penDown, prevPos, sp, width, delay, power, doDryRun, isTextMode, xOffset, yOffset)
+      prevPos = generateMoveCommands(bb, c[2..-1].split(","), penDown, prevPos, sp, width, delay, power, doDryRun, isTextMode, doMirror, xOffset, yOffset)
     end
     line += 1
     percent = line*100.0/lines.size()
@@ -248,12 +251,18 @@ puts "Using delay #{delay}"
 
 commands = text.split(";")
 
+startTime = Time.now
+
 bb = pass1(commands, isTextMode)
 
-pass2(bb, commands, $sp, width, power, delay, doDryRun, isTextMode, xOffset, yOffset)
+pass2(bb, commands, $sp, width, power, delay, doDryRun, isTextMode, doMirror, xOffset, yOffset)
 
 if !isTextMode
   sleep 1
   reset($sp)
   poweroff($sp)
 end
+
+endTime = Time.now
+
+puts "Completed in #{endTime-startTime} seconds"
